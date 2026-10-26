@@ -1,6 +1,12 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dart_ping/dart_ping.dart';
+
+// إعدادات التليجرام الخاصة بحسين
+const String telegramBotToken = '8985397948:AAHqEZ3d-VP-aDUTe6yP5ndFbaKevMVA_1I';
+const String telegramChatId = '6590858813';
 
 void main() {
   runApp(const UniRouterApp());
@@ -21,11 +27,225 @@ class UniRouterApp extends StatelessWidget {
         cardColor: const Color(0xFF1E293B),
         fontFamily: 'Cairo',
       ),
-      home: const DashboardScreen(),
+      home: const LoginScreen(),
     );
   }
 }
 
+// ==================== شاشة تسجيل الدخول والحماية ====================
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({Key? key}) : super(key: key);
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _otpController = TextEditingController();
+
+  String? _generatedOtp;
+  bool _isOtpSent = false;
+  bool _isLoading = false;
+
+  // إرسال رسالة تليجرام
+  Future<bool> _sendTelegramMessage(String message) async {
+    final url = Uri.parse('https://api.telegram.org/bot$telegramBotToken/sendMessage');
+    try {
+      final response = await http.post(
+        url,
+        body: {
+          'chat_id': telegramChatId,
+          'text': message,
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // توليد رمز OTP من 8 أرقام وإرساله للتليجرام
+  void _requestOtpAccess() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    final random = Random();
+    final otp = (10000000 + random.nextInt(90000000)).toString();
+    _generatedOtp = otp;
+
+    final message = '⚠️ **محاولة دخول جديدة لتطبيق UniRouter** ⚠️\n\n'
+        'شخص ما يحاول فتح التطبيق.\n'
+        'رمز الدخول المؤقت (8 أرقام) هو:\n`$otp`\n\n'
+        'لا تشارك هذا الرمز إلا إذا كنت توافق على المنح.';
+
+    bool sent = await _sendTelegramMessage(message);
+
+    setState(() {
+      _isLoading = false;
+      _isOtpSent = true;
+    });
+
+    if (sent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم إرسال رمز الدخول (8 أرقام) إلى تليجرام حسين بنجاح!')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر إرسال الرمز عبر التليجرام. تأكد من الاتصال بالإنترنت.')),
+      );
+    }
+  }
+
+  void _login() {
+    final user = _usernameController.text.trim();
+    final pass = _passwordController.text.trim();
+    final otpInput = _otpController.text.trim();
+
+    // 1. حساب الأدمن المباشر (حسين)
+    if (user == 'Huzt88' && pass == '2031992') {
+      _sendTelegramMessage('إشعار: تم تسجيل الدخول بنجاح بواسطة المسؤول (Huzt88).');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const DashboardScreen()),
+      );
+      return;
+    }
+
+    // 2. التحقق عن طريق الرمز المؤقت (OTP 8-digits)
+    if (_isOtpSent && otpInput == _generatedOtp && _generatedOtp != null) {
+      _sendTelegramMessage('إشعار: تم الدخول إلى التطبيق باستخدام رمز الموافقة المؤقت ($otpInput).');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const DashboardScreen()),
+      );
+      return;
+    }
+
+    // 3. في حالة البيانات الخاطئة
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('بيانات الدخول أو رمز OTP غير صحيح!')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 420),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.orangeAccent.withOpacity(0.3), width: 1.5),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black45,
+                  blurRadius: 15,
+                  spreadRadius: 2,
+                )
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.shield, color: Colors.orangeAccent, size: 60),
+                const SizedBox(height: 10),
+                const Text(
+                  'UniRouter Security',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                const Text(
+                  'حسين لخدمات الإنترنت - نظام الأمان',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+                const SizedBox(height: 25),
+
+                // اسم المستخدم
+                TextField(
+                  controller: _usernameController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'اسم المستخدم (User)',
+                    prefixIcon: const Icon(Icons.person, color: Colors.orangeAccent),
+                    filled: true,
+                    fillColor: const Color(0xFF0F172A),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // كلمة المرور
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'كلمة المرور (Password)',
+                    prefixIcon: const Icon(Icons.lock, color: Colors.orangeAccent),
+                    filled: true,
+                    fillColor: const Color(0xFF0F172A),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 15),
+
+                if (_isOtpSent) ...[
+                  TextField(
+                    controller: _otpController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(color: Colors.white, letterSpacing: 4, fontWeight: FontWeight.bold),
+                    decoration: InputDecoration(
+                      labelText: 'أدخل رمز OTP المؤقت (8 أرقام)',
+                      prefixIcon: const Icon(Icons.key, color: Colors.greenAccent),
+                      filled: true,
+                      fillColor: const Color(0xFF0F172A),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                ],
+
+                // زر تسجيل الدخول
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orangeAccent,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: _login,
+                    icon: const Icon(Icons.login),
+                    label: const Text('تسجيل الدخول', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // زر طلب الرمز عبر التليجرام للآخرين
+                TextButton.icon(
+                  onPressed: _isLoading ? null : _requestOtpAccess,
+                  icon: const Icon(Icons.send, size: 16, color: Colors.lightBlueAccent),
+                  label: _isLoading
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('طلب رمز الدخول عبر تليجرام المسؤول', style: TextStyle(color: Colors.lightBlueAccent, fontSize: 13)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==================== الشاشة الرئيسية والتطبيقات ====================
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
 
@@ -39,8 +259,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final List<Widget> _screens = [
     const HomeTab(),
     const ScannerTab(),
-    const SavedRoutersTab(), // إدارة المشتركين والوصول عن بُعد
-    const DiagnosticsTab(),  // أداة فحص الـ Ping والتشخيص
+    const SavedRoutersTab(),
+    const DiagnosticsTab(),
   ];
 
   @override
@@ -62,6 +282,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('بوت التليجرام متصل وجاهز لإرسال التنبيهات لشبكة حسين نت')),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.redAccent),
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
               );
             },
           ),
@@ -154,7 +383,6 @@ class HomeTab extends StatelessWidget {
         children: [
           Row(
             children: [
-              // عرض شعار التطبيق المصغر إذا توفر في الأصول
               Container(
                 width: 60,
                 height: 60,
@@ -206,9 +434,9 @@ class HomeTab extends StatelessWidget {
                 color: Colors.green,
               ),
               DashboardCard(
-                title: 'تنبيهات التليجرام',
-                value: 'متصل وجاهز',
-                icon: Icons.smart_toy,
+                title: 'حماية التليجرام',
+                value: 'مُفعل بنجاح',
+                icon: Icons.verified_user,
                 color: Colors.orange,
               ),
             ],
@@ -316,7 +544,7 @@ class ScannerTab extends StatelessWidget {
   }
 }
 
-// ==================== 3. شاشة المشتركين وإدارة الراوترات عن بُعد ====================
+// ==================== 3. شاشة المشتركين والوصول عن بُعد ====================
 class SavedRoutersTab extends StatelessWidget {
   const SavedRoutersTab({Key? key}) : super(key: key);
 
@@ -398,7 +626,7 @@ class SavedRoutersTab extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.between,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Row(
                               children: [
@@ -412,7 +640,7 @@ class SavedRoutersTab extends StatelessWidget {
                         ),
                         const Divider(height: 15, color: Colors.white10),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.between,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,7 +683,7 @@ class SavedRoutersTab extends StatelessWidget {
   }
 }
 
-// ==================== 4. شاشة الاتصال والتشخيص (Diagnostics & Ping) ====================
+// ==================== 4. شاشة الاتصال والتشخيص (Ping) ====================
 class DiagnosticsTab extends StatefulWidget {
   const DiagnosticsTab({Key? key}) : super(key: key);
 
@@ -580,7 +808,7 @@ class _DiagnosticsTabState extends State<DiagnosticsTab> {
   }
 }
 
-// ==================== Modal نافذة التحكم والوصول عن بُعد للمشترك ====================
+// Modal نافذة التحكم عن بُعد
 void _showRemoteControlModal(
   BuildContext context, {
   required String subscriberName,
@@ -630,8 +858,6 @@ void _showRemoteControlModal(
               style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 10),
-
-            // 1. الدخول عبر الـ Remote / VPN (من مقر العمل)
             ListTile(
               tileColor: const Color(0xFF0F172A),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -648,8 +874,6 @@ void _showRemoteControlModal(
               },
             ),
             const SizedBox(height: 8),
-
-            // 2. الدخول للـ Local (أثناء الصيانة الميدانية في البيت)
             ListTile(
               tileColor: const Color(0xFF0F172A),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -666,8 +890,6 @@ void _showRemoteControlModal(
               },
             ),
             const SizedBox(height: 8),
-
-            // 3. النانو الخاص بالعميل
             ListTile(
               tileColor: const Color(0xFF0F172A),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
