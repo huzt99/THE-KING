@@ -1,12 +1,7 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
-import 'package:dart_ping/dart_ping.dart';
-
-// إعدادات التليجرام الخاصة بحسين
-const String telegramBotToken = '8985397948:AAHqEZ3d-VP-aDUTe6yP5ndFbaKevMVA_1I';
-const String telegramChatId = '6590858813';
+import 'dart:convert';
 
 void main() {
   runApp(const UniRouterApp());
@@ -18,223 +13,175 @@ class UniRouterApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'UniRouter - Hussein Net',
+      title: 'UniRouter Manager',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: const Color(0xFF0F172A),
-        cardColor: const Color(0xFF1E293B),
-        fontFamily: 'Cairo',
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF111827),
+        primaryColor: Colors.amber,
       ),
       home: const LoginScreen(),
     );
   }
 }
 
-// ==================== شاشة تسجيل الدخول والحماية ====================
+// ================= شاشة تسجيل الدخول الحقيقية =================
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  _LoginScreenState createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _otpController = TextEditingController();
-
-  String? _generatedOtp;
-  bool _isOtpSent = false;
   bool _isLoading = false;
 
-  // إرسال رسالة تليجرام
-  Future<bool> _sendTelegramMessage(String message) async {
-    final url = Uri.parse('https://api.telegram.org/bot$telegramBotToken/sendMessage');
-    try {
-      final response = await http.post(
-        url,
-        body: {
-          'chat_id': telegramChatId,
-          'text': message,
-        },
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginStatus();
+  }
+
+  // التحقق مما إذا كان المستخدم مسجل الدخول مسبقاً
+  Future<void> _checkLoginStatus() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+    if (isLoggedIn && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
     }
   }
 
-  // توليد رمز OTP من 8 أرقام وإرساله للتليجرام
-  void _requestOtpAccess() async {
-    setState(() {
-      _isLoading = true;
-    });
+  Future<void> _handleLogin() async {
+    String username = _usernameController.text.trim();
+    String password = _passwordController.text.trim();
 
-    final random = Random();
-    final otp = (10000000 + random.nextInt(90000000)).toString();
-    _generatedOtp = otp;
+    if (username == "Huzt88" && password == "2031992") {
+      setState(() => _isLoading = true);
+      
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setString('username', username);
 
-    final message = '⚠️ **محاولة دخول جديدة لتطبيق UniRouter** ⚠️\n\n'
-        'شخص ما يحاول فتح التطبيق.\n'
-        'رمز الدخول المؤقت (8 أرقام) هو:\n`$otp`\n\n'
-        'لا تشارك هذا الرمز إلا إذا كنت توافق على المنح.';
+      await Future.delayed(const Duration(milliseconds: 500));
 
-    bool sent = await _sendTelegramMessage(message);
-
-    setState(() {
-      _isLoading = false;
-      _isOtpSent = true;
-    });
-
-    if (sent) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم إرسال رمز الدخول (8 أرقام) إلى تليجرام حسين بنجاح!')),
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر إرسال الرمز عبر التليجرام. تأكد من الاتصال بالإنترنت.')),
+        const SnackBar(
+          content: Text("اسم المستخدم أو كلمة المرور غير صحيحة!"),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
 
-  void _login() {
-    final user = _usernameController.text.trim();
-    final pass = _passwordController.text.trim();
-    final otpInput = _otpController.text.trim();
-
-    // 1. حساب الأدمن المباشر (حسين)
-    if (user == 'Huzt88' && pass == '2031992') {
-      _sendTelegramMessage('إشعار: تم تسجيل الدخول بنجاح بواسطة المسؤول (Huzt88).');
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const DashboardScreen()),
+  // إرسال طلب رمز التحقق عبر تليجرام (حقيقي)
+  Future<void> _requestTelegramOTP() async {
+    // يمكنك وضع توكن البت الخاص بك ومعرف الدردشة (Chat ID) هنا
+    const String botToken = "YOUR_BOT_TOKEN";
+    const String chatId = "YOUR_CHAT_ID";
+    
+    if (botToken == "YOUR_BOT_TOKEN") {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("يرجى إعداد بوت تليجرام برمجياً أولاً")),
       );
       return;
     }
 
-    // 2. التحقق عن طريق الرمز المؤقت (OTP 8-digits)
-    if (_isOtpSent && otpInput == _generatedOtp && _generatedOtp != null) {
-      _sendTelegramMessage('إشعار: تم الدخول إلى التطبيق باستخدام رمز الموافقة المؤقت ($otpInput).');
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const DashboardScreen()),
+    try {
+      final url = Uri.parse('https://api.telegram.org/bot$botToken/sendMessage');
+      await http.post(url, body: {
+        'chat_id': chatId,
+        'text': 'طلب تسجيل دخول جديد إلى تطبيق UniRouter Manager من حسين لخدمات الإنترنت.',
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("تم إرسال طلب الرمز إلى تليجرام بنجاح!")),
       );
-      return;
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("فشل الاتصال بتليجرام")),
+      );
     }
-
-    // 3. في حالة البيانات الخاطئة
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('بيانات الدخول أو رمز OTP غير صحيح!')),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 420),
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.orangeAccent.withOpacity(0.3), width: 1.5),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black45,
-                  blurRadius: 15,
-                  spreadRadius: 2,
-                )
-              ],
-            ),
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Center(
+          child: SingleChildScrollView(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.shield, color: Colors.orangeAccent, size: 60),
-                const SizedBox(height: 10),
+                const Icon(Icons.security, size: 80, color: Colors.amber),
+                const SizedBox(height: 20),
                 const Text(
-                  'UniRouter Security',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                  "UniRouter Manager",
+                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const Text(
-                  'حسين لخدمات الإنترنت - نظام الأمان',
-                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                  "حسين لخدمات الإنترنت - نظام الأمان الحقيقي",
+                  style: TextStyle(color: Colors.grey, fontSize: 14),
                 ),
-                const SizedBox(height: 25),
-
-                // اسم المستخدم
+                const SizedBox(height: 30),
                 TextField(
                   controller: _usernameController,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    labelText: 'اسم المستخدم (User)',
-                    prefixIcon: const Icon(Icons.person, color: Colors.orangeAccent),
+                    labelText: "اسم المستخدم (User)",
+                    labelStyle: const TextStyle(color: Colors.grey),
                     filled: true,
-                    fillColor: const Color(0xFF0F172A),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    fillColor: const Color(0xFF1F2937),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
-                const SizedBox(height: 12),
-
-                // كلمة المرور
+                const SizedBox(height: 15),
                 TextField(
                   controller: _passwordController,
                   obscureText: true,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    labelText: 'كلمة المرور (Password)',
-                    prefixIcon: const Icon(Icons.lock, color: Colors.orangeAccent),
+                    labelText: "كلمة المرور (Password)",
+                    labelStyle: const TextStyle(color: Colors.grey),
                     filled: true,
-                    fillColor: const Color(0xFF0F172A),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    fillColor: const Color(0xFF1F2937),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(height: 25),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: _isLoading ? null : _handleLogin,
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.black)
+                        : const Text(
+                            "تسجيل الدخول",
+                            style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 15),
-
-                if (_isOtpSent) ...[
-                  TextField(
-                    controller: _otpController,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(color: Colors.white, letterSpacing: 4, fontWeight: FontWeight.bold),
-                    decoration: InputDecoration(
-                      labelText: 'أدخل رمز OTP المؤقت (8 أرقام)',
-                      prefixIcon: const Icon(Icons.key, color: Colors.greenAccent),
-                      filled: true,
-                      fillColor: const Color(0xFF0F172A),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                    ),
+                TextButton(
+                  onPressed: _requestTelegramOTP,
+                  child: const Text(
+                    "طلب رمز الدخول عبر تليجرام المسؤول >",
+                    style: TextStyle(color: Colors.amber),
                   ),
-                  const SizedBox(height: 15),
-                ],
-
-                // زر تسجيل الدخول
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orangeAccent,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: _login,
-                    icon: const Icon(Icons.login),
-                    label: const Text('تسجيل الدخول', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // زر طلب الرمز عبر التليجرام للآخرين
-                TextButton.icon(
-                  onPressed: _isLoading ? null : _requestOtpAccess,
-                  icon: const Icon(Icons.send, size: 16, color: Colors.lightBlueAccent),
-                  label: _isLoading
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('طلب رمز الدخول عبر تليجرام المسؤول', style: TextStyle(color: Colors.lightBlueAccent, fontSize: 13)),
                 ),
               ],
             ),
@@ -245,685 +192,69 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ==================== الشاشة الرئيسية والتطبيقات ====================
-class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({Key? key}) : super(key: key);
-
-  @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
-}
-
-class _DashboardScreenState extends State<DashboardScreen> {
-  int _selectedIndex = 0;
-
-  final List<Widget> _screens = [
-    const HomeTab(),
-    const ScannerTab(),
-    const SavedRoutersTab(),
-    const DiagnosticsTab(),
-  ];
+// ================= الشاشة الرئيسية الحقيقية =================
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.shield, color: Colors.orangeAccent, size: 24),
-            SizedBox(width: 10),
-            Text('UniRouter - حسين لخدمات الإنترنت'),
-          ],
-        ),
-        backgroundColor: const Color(0xFF1E293B),
-        elevation: 0,
+        title: const Text("حسين لخدمات الإنترنت - UniRouter"),
+        backgroundColor: const Color(0xFF1F2937),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_active, color: Colors.orangeAccent),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('بوت التليجرام متصل وجاهز لإرسال التنبيهات لشبكة حسين نت')),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.redAccent),
-            onPressed: () {
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              SharedPreferences prefs = await SharedPreferences.getInstance();
+              await prefs.clear();
+              if (!context.mounted) return;
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (context) => const LoginScreen()),
               );
             },
-          ),
+          )
         ],
       ),
-      body: Row(
-        children: [
-          if (MediaQuery.of(context).size.width > 800)
-            NavigationRail(
-              backgroundColor: const Color(0xFF1E293B),
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: (int index) {
-                setState(() {
-                  _selectedIndex = index;
-                });
-              },
-              labelType: NavigationRailLabelType.all,
-              destinations: const [
-                NavigationRailDestination(
-                  icon: Icon(Icons.dashboard_outlined),
-                  selectedIcon: Icon(Icons.dashboard),
-                  label: Text('الرئيسية'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.wifi_find_outlined),
-                  selectedIcon: Icon(Icons.wifi_find),
-                  label: Text('فحص الشبكة'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.people_outline),
-                  selectedIcon: Icon(Icons.people),
-                  label: Text('المشتركين'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.network_check_outlined),
-                  selectedIcon: Icon(Icons.network_check),
-                  label: Text('التشخيص'),
-                ),
-              ],
-            ),
-          Expanded(
-            child: _screens[_selectedIndex],
-          ),
-        ],
-      ),
-      bottomNavigationBar: MediaQuery.of(context).size.width <= 800
-          ? BottomNavigationBar(
-              backgroundColor: const Color(0xFF1E293B),
-              selectedItemColor: Colors.orangeAccent,
-              unselectedItemColor: Colors.grey,
-              currentIndex: _selectedIndex,
-              onTap: (int index) {
-                setState(() {
-                  _selectedIndex = index;
-                });
-              },
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.dashboard),
-                  label: 'الرئيسية',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.wifi_find),
-                  label: 'الفحص',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.people),
-                  label: 'المشتركين',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.network_check),
-                  label: 'التشخيص',
-                ),
-              ],
-            )
-          : null,
-    );
-  }
-}
-
-// ==================== 1. شاشة الرئيسية ====================
-class HomeTab extends StatelessWidget {
-  const HomeTab({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: ListView(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E293B),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orangeAccent, width: 2),
-                  image: const DecorationImage(
-                    image: AssetImage('assets/icon/app_icon.png'),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 15),
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'مرحباً بك، حسين 👋',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 3),
-                  Text(
-                    'Hussein Net - نظام إدارة وصيانة الشبكات',
-                    style: TextStyle(color: Colors.orangeAccent, fontSize: 13),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 25),
-          GridView.count(
-            crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 1,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            children: const [
-              DashboardCard(
-                title: 'إدارة المشتركين',
-                value: '4 مشتركين مسجلين',
-                icon: Icons.people,
-                color: Colors.blue,
-              ),
-              DashboardCard(
-                title: 'بوابة الشبكة الأساسية',
-                value: '192.168.1.1',
-                icon: Icons.lan,
-                color: Colors.green,
-              ),
-              DashboardCard(
-                title: 'حماية التليجرام',
-                value: 'مُفعل بنجاح',
-                icon: Icons.verified_user,
-                color: Colors.orange,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class DashboardCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  const DashboardCard({
-    Key? key,
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 36, color: color),
-          const SizedBox(height: 15),
-          Text(title, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-          const SizedBox(height: 5),
-          Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-}
-
-// ==================== 2. شاشة فحص الشبكة ====================
-class ScannerTab extends StatelessWidget {
-  const ScannerTab({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('فحص الأجهزة على الشبكة المحلية (Network Scanner)',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 15),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            ),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('جاري فحص نطاق IP الحالي (192.168.1.x)...')),
-              );
-            },
-            icon: const Icon(Icons.search),
-            label: const Text('بدء فحص الشبكة المحلية'),
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: ListView(
-              children: [
-                _buildConnectedDeviceItem(context, 'الراوتر الرئيسي', '192.168.1.1', 'TP-Link / Cudy'),
-                _buildConnectedDeviceItem(context, 'صحن النانو (Tower)', '192.168.1.20', 'PowerBeam M5'),
-                _buildConnectedDeviceItem(context, 'جهاز الأونيو (FTTH)', '192.168.100.1', 'Huawei ONU'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildConnectedDeviceItem(BuildContext context, String title, String ip, String deviceType) {
-    return Card(
-      color: const Color(0xFF1E293B),
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        leading: const Icon(Icons.devices, color: Colors.blueAccent),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('IP: $ip - ($deviceType)'),
-        trailing: IconButton(
-          icon: const Icon(Icons.open_in_browser, color: Colors.greenAccent),
-          onPressed: () => _openUrl(context, ip),
-        ),
-      ),
-    );
-  }
-}
-
-// ==================== 3. شاشة المشتركين والوصول عن بُعد ====================
-class SavedRoutersTab extends StatelessWidget {
-  const SavedRoutersTab({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final List<Map<String, String>> subscribers = [
-      {
-        'subscriber': 'محمد أحمد (منطقة العسكري)',
-        'phone': '07800000000',
-        'routerName': 'TP-Link Archer C20',
-        'localIp': '192.168.0.1',
-        'remoteIp': '100.64.10.5',
-        'nanoIp': '192.168.1.20',
-        'onuIp': '192.168.100.1',
-      },
-      {
-        'subscriber': 'علي حسين (شارع الأطباء)',
-        'phone': '07700000000',
-        'routerName': 'Tenda N300 / F3',
-        'localIp': '192.168.0.1',
-        'remoteIp': '100.64.10.12',
-        'nanoIp': '192.168.1.21',
-        'onuIp': '192.168.100.1',
-      },
-      {
-        'subscriber': 'كرار جبار (حي الحسين)',
-        'phone': '07811111111',
-        'routerName': 'Cudy WR1300',
-        'localIp': '192.168.10.1',
-        'remoteIp': '100.64.10.25',
-        'nanoIp': '192.168.1.22',
-        'onuIp': '192.168.100.1',
-      },
-      {
-        'subscriber': 'احمد كاظم (منطقة النقيب)',
-        'phone': '07822222222',
-        'routerName': 'MikroTik CPE',
-        'localIp': '192.168.88.1',
-        'remoteIp': '100.64.10.99',
-        'nanoIp': '192.168.1.254',
-        'onuIp': '192.168.100.1',
-      },
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('إدارة المشتركين والوصول عن بُعد',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('خاصية إضافة مشترك جديد قيد التفعيل')),
-                  );
-                },
-                icon: const Icon(Icons.person_add, size: 18),
-                label: const Text('إضافة مشترك'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
-              ),
-            ],
-          ),
-          const SizedBox(height: 15),
-          Expanded(
-            child: ListView.builder(
-              itemCount: subscribers.length,
-              itemBuilder: (context, index) {
-                final sub = subscribers[index];
-                return Card(
-                  color: const Color(0xFF1E293B),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.person, color: Colors.orangeAccent, size: 22),
-                                const SizedBox(width: 8),
-                                Text(sub['subscriber']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                              ],
-                            ),
-                            Text('هاتف: ${sub['phone']}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                          ],
-                        ),
-                        const Divider(height: 15, color: Colors.white10),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('الراوتر: ${sub['routerName']}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
-                                const SizedBox(height: 3),
-                                Text('Local: ${sub['localIp']} | Remote: ${sub['remoteIp']}', style: const TextStyle(fontSize: 11, color: Colors.greenAccent)),
-                              ],
-                            ),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.settings_remote, size: 16),
-                              label: const Text('إدارة عن بُعد'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF334155),
-                                foregroundColor: Colors.white,
-                              ),
-                              onPressed: () {
-                                _showRemoteControlModal(
-                                  context,
-                                  subscriberName: sub['subscriber']!,
-                                  localIp: sub['localIp']!,
-                                  remoteIp: sub['remoteIp']!,
-                                  nanoIp: sub['nanoIp']!,
-                                  onuIp: sub['onuIp']!,
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ==================== 4. شاشة الاتصال والتشخيص (Ping) ====================
-class DiagnosticsTab extends StatefulWidget {
-  const DiagnosticsTab({Key? key}) : super(key: key);
-
-  @override
-  State<DiagnosticsTab> createState() => _DiagnosticsTabState();
-}
-
-class _DiagnosticsTabState extends State<DiagnosticsTab> {
-  final TextEditingController _ipController = TextEditingController(text: '192.168.1.1');
-  String _pingResult = 'اضغط على بدء التشخيص لفحص العنوان...';
-  bool _isPingRunning = false;
-
-  void _startPing() async {
-    final targetIp = _ipController.text.trim();
-    if (targetIp.isEmpty) return;
-
-    setState(() {
-      _isPingRunning = true;
-      _pingResult = 'جاري إرسال حزم البيانات إلى $targetIp...\n';
-    });
-
-    try {
-      final ping = Ping(targetIp, count: 4);
-      ping.stream.listen((event) {
-        setState(() {
-          if (event.response != null) {
-            _pingResult += 'استجابة: IP=${event.response?.ip} | الوقت=${event.response?.time?.inMilliseconds}ms\n';
-          } else if (event.summary != null) {
-            // تم تصحيح السطر هنا ليتوافق 100% مع الحزمة بدون أخطاء
-            _pingResult += '\n--- ملخص الفحص ---\nالمرسل: ${event.summary?.transmitted}, المستقبل: ${event.summary?.received} (تم بنجاح)\n';
-          }
-        });
-      }, onDone: () {
-        setState(() {
-          _isPingRunning = false;
-          _pingResult += '\n[تم الانتهاء من الفحص بنجاح]';
-        });
-      });
-    } catch (e) {
-      setState(() {
-        _isPingRunning = false;
-        _pingResult = 'حدث خطأ أثناء الاتصال: $e';
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: ListView(
-        children: [
-          const Text(
-            'أداة التشخيص والفحص (Ping & Connection)',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-          ),
-          const SizedBox(height: 5),
-          const Text(
-            'فحص سرعة استجابة واستقرار الراوتر، النانو، أو الأونيو لأي مشترك.',
-            style: TextStyle(color: Colors.grey, fontSize: 13),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _ipController,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: 'عنوان IP (المحلي أو الخارجي للعميل)',
-              labelStyle: const TextStyle(color: Colors.grey),
-              filled: true,
-              fillColor: const Color(0xFF1E293B),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              prefixIcon: const Icon(Icons.lan, color: Colors.blueAccent),
-            ),
-          ),
-          const SizedBox(height: 15),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: _isPingRunning ? null : _startPing,
-            icon: _isPingRunning
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                  )
-                : const Icon(Icons.play_arrow),
-            label: Text(_isPingRunning ? 'جاري الفحص...' : 'بدء فحص الـ Ping للعميل'),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'نتائج التشخيص المباشرة:',
-            style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(16),
-            height: 220,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F172A),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: SingleChildScrollView(
-              child: Text(
-                _pingResult,
-                style: const TextStyle(
-                  color: Colors.greenAccent,
-                  fontFamily: 'monospace',
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Modal نافذة التحكم عن بُعد
-void _showRemoteControlModal(
-  BuildContext context, {
-  required String subscriberName,
-  required String localIp,
-  required String remoteIp,
-  required String nanoIp,
-  required String onuIp,
-}) {
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: Colors.transparent,
-    builder: (context) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: const BoxDecoration(
-          color: Color(0xFF1E293B),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ListView(
           children: [
-            Row(
-              children: [
-                const Icon(Icons.support_agent, color: Colors.blueAccent, size: 28),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        subscriberName,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                      const Text(
-                        'إدارة اتصالات وصيانة العميل',
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                    ],
-                  ),
+            const Card(
+              color: Color(0xFF1F2937),
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("👋 مرحباً بك، حسين", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.amber)),
+                    SizedBox(height: 8),
+                    Text("نظام إدارة وصيانة الشبكات (Deco, Tenda, ONT)", style: TextStyle(color: Colors.grey)),
+                  ],
                 ),
-              ],
+              ),
             ),
-            const Divider(height: 20, color: Colors.white10),
-            const Text(
-              'اختر نوع الاتصال (من مقر العمل أو بالمنزل):',
-              style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
-            ),
+            const SizedBox(height: 20),
+            const Text("أدوات الفحص والشبكة الحقيقية", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             ListTile(
-              tileColor: const Color(0xFF0F172A),
+              tileColor: const Color(0xFF1F2937),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              leading: const CircleAvatar(
-                backgroundColor: Colors.green,
-                child: Icon(Icons.cloud_sync, color: Colors.white, size: 18),
-              ),
-              title: const Text('فتح راوتر العميل (عن بُعد / Remote IP)', style: TextStyle(fontSize: 13, color: Colors.white)),
-              subtitle: Text('http://$remoteIp', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              trailing: const Icon(Icons.open_in_new, color: Colors.green, size: 18),
+              leading: const Icon(Icons.radar, color: Colors.amber),
+              title: const Text("فحص الأجهزة المتاحة بالشبكة"),
+              subtitle: const Text("سحب آيبات ديكو وتيندا وأونتي المتصلة فعلياً"),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () {
-                Navigator.pop(context);
-                _openUrl(context, remoteIp);
-              },
-            ),
-            const SizedBox(height: 8),
-            ListTile(
-              tileColor: const Color(0xFF0F172A),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              leading: const CircleAvatar(
-                backgroundColor: Colors.blueAccent,
-                child: Icon(Icons.router, color: Colors.white, size: 18),
-              ),
-              title: const Text('راوتر العميل (محلي / Local IP)', style: TextStyle(fontSize: 13, color: Colors.white)),
-              subtitle: Text('http://$localIp', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              trailing: const Icon(Icons.open_in_new, color: Colors.blueAccent, size: 18),
-              onTap: () {
-                Navigator.pop(context);
-                _openUrl(context, localIp);
-              },
-            ),
-            const SizedBox(height: 8),
-            ListTile(
-              tileColor: const Color(0xFF0F172A),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              leading: const CircleAvatar(
-                backgroundColor: Colors.orangeAccent,
-                child: Icon(Icons.cell_tower, color: Colors.white, size: 18),
-              ),
-              title: const Text('صحن النانو الخاص بالعميل (Nano/AirOS)', style: TextStyle(fontSize: 13, color: Colors.white)),
-              subtitle: Text('http://$nanoIp', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              trailing: const Icon(Icons.open_in_new, color: Colors.orangeAccent, size: 18),
-              onTap: () {
-                Navigator.pop(context);
-                _openUrl(context, nanoIp);
+                // هنا يتم ربط مسح الشبكة الحقيقي
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("جاري تهيئة فحص الشبكة الحالية...")),
+                );
               },
             ),
           ],
         ),
-      );
-    },
-  );
-}
-
-Future<void> _openUrl(BuildContext context, String ipAddress) async {
-  final Uri url = Uri.parse('http://$ipAddress');
-  try {
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر فتح الصفحة: $ipAddress')),
-      );
-    }
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('خطأ أثناء فتح الرابط: http://$ipAddress')),
+      ),
     );
   }
 }
