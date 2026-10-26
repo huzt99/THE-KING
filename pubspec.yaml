@@ -17,9 +17,10 @@ dependencies:
   http: ^1.2.0                   # لإرسال طلبات HTTP/REST للراوترات
   ping_discover_network_plus: ^2.1.0 # لفحص الأجهزة المتصلة بالشبكة
   dart_ping: ^8.0.1              # أداة تشخيص Ping
-  shared_preferences: ^2.2.2    # لحفظ بيانات الراوتر المحفوظة
-  crypto: ^3.0.3                 # للتشفير (MD5/SHA256) المطلوبة في راوترات مثل TP-Link/Tenda
+  shared_preferences: ^2.2.2     # لحفظ بيانات الراوتر المحفوظة
+  crypto: ^3.0.3                 # للتشفير (MD5/SHA256) المطلوبة لراوترات TP-Link/Tenda
   font_awesome_flutter: ^10.7.0  # أيقونات عصرية
+  url_launcher: ^6.2.5           # لفتح روابط الراوتر، النانو، والأونيو في متصفح الهاتف
 
 dev_dependencies:
   flutter_test:
