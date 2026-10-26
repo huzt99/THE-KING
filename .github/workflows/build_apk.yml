@@ -30,7 +30,7 @@ jobs:
       - name: Nuke Old Android Folder & Recreate v2
         run: |
           rm -rf android
-          flutter create . --platforms=android --org com.example
+          flutter create . --platforms=android --org com.example --project-name unirouter_manager
 
       - name: Get Dependencies
         run: flutter pub get
