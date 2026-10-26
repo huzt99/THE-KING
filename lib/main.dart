@@ -712,8 +712,8 @@ class _DiagnosticsTabState extends State<DiagnosticsTab> {
           if (event.response != null) {
             _pingResult += 'استجابة: IP=${event.response?.ip} | الوقت=${event.response?.time?.inMilliseconds}ms\n';
           } else if (event.summary != null) {
-            // تم تصحيح الاسم هنا ليتطابق تماماً مع إصدار الحزمة الحديث packetsLoss
-            _pingResult += '\n--- ملخص الفحص ---\nالمرسل: ${event.summary?.transmitted}, المستقبل: ${event.summary?.received}, الفاقد: ${event.summary?.packetsLoss}%\n';
+            // التعديل السحري هنا: استخدام packetLoss المتوافقة مع الحزمة تماماً
+            _pingResult += '\n--- ملخص الفحص ---\nالمرسل: ${event.summary?.transmitted}, المستقبل: ${event.summary?.received}, الفاقد: ${event.summary?.packetLoss}%\n';
           }
         });
       }, onDone: () {
