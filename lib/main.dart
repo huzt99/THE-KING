@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:dart_ping/dart_ping.dart';
 
 void main() {
   runApp(const UniRouterApp());
@@ -39,6 +40,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     const HomeTab(),
     const ScannerTab(),
     const SavedRoutersTab(),
+    const DiagnosticsTab(), // الشاشة الجديدة الخاصة بالاتصال والتشخيص
   ];
 
   @override
@@ -85,7 +87,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 NavigationRailDestination(
                   icon: Icon(Icons.router_outlined),
                   selectedIcon: Icon(Icons.router),
-                  label: Text('الراوترات المحفوظة'),
+                  label: Text('المحفوظة'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.network_check_outlined),
+                  selectedIcon: Icon(Icons.network_check),
+                  label: Text('التشخيص'),
                 ),
               ],
             ),
@@ -117,6 +124,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 BottomNavigationBarItem(
                   icon: Icon(Icons.router),
                   label: 'المحفوظة',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.network_check),
+                  label: 'التشخيص (Ping)',
                 ),
               ],
             )
@@ -371,6 +382,131 @@ class SavedRoutersTab extends StatelessWidget {
   }
 }
 
+// ==================== 4. شاشة الاتصال والتشخيص (Diagnostics & Ping) ====================
+class DiagnosticsTab extends StatefulWidget {
+  const DiagnosticsTab({Key? key}) : super(key: key);
+
+  @override
+  State<DiagnosticsTab> createState() => _DiagnosticsTabState();
+}
+
+class _DiagnosticsTabState extends State<DiagnosticsTab> {
+  final TextEditingController _ipController = TextEditingController(text: '192.168.1.1');
+  String _pingResult = 'اضغط على بدء التشخيص لفحص العنوان...';
+  bool _isPingRunning = false;
+
+  void _startPing() async {
+    final targetIp = _ipController.text.trim();
+    if (targetIp.isEmpty) return;
+
+    setState(() {
+      _isPingRunning = true;
+      _pingResult = 'جاري إرسال حزم البيانات إلى $targetIp...\n';
+    });
+
+    try {
+      final ping = Ping(targetIp, count: 4);
+      ping.stream.listen((event) {
+        setState(() {
+          if (event.response != null) {
+            _pingResult += 'استجابة: IP=${event.response?.ip} | الوقت=${event.response?.time?.inMilliseconds}ms\n';
+          } else if (event.summary != null) {
+            _pingResult += '\n--- ملخص الفحص ---\nالمرسل: ${event.summary?.transmitted}, المستقبل: ${event.summary?.received}, الفاقد: ${event.summary?.packetLoss}%\n';
+          }
+        });
+      }, onDone: () {
+        setState(() {
+          _isPingRunning = false;
+          _pingResult += '\n[تم الانتهاء من الفحص بنجاح]';
+        });
+      });
+    } catch (e) {
+      setState(() {
+        _isPingRunning = false;
+        _pingResult = 'حدث خطأ أثناء الاتصال: $e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: ListView(
+        children: [
+          const Text(
+            'أداة التشخيص والفحص (Ping & Connection)',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            'فحص سرعة استجابة واستقرار الراوتر، النانو، أو الأونيو.',
+            style: TextStyle(color: Colors.grey, fontSize: 13),
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _ipController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: 'عنوان IP الجهاز (مثل: 192.168.1.1 أو 192.168.1.20)',
+              labelStyle: const TextStyle(color: Colors.grey),
+              filled: true,
+              fillColor: const Color(0xFF1E293B),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              prefixIcon: const Icon(Icons.lan, color: Colors.blueAccent),
+            ),
+          ),
+          const SizedBox(height: 15),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blueAccent,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: _isPingRunning ? null : _startPing,
+            icon: _isPingRunning
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Icon(Icons.play_arrow),
+            label: Text(_isPingRunning ? 'جاري الفحص...' : 'بدء فحص الـ Ping'),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'نتائج التشخيص المباشرة:',
+            style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(16),
+            height: 220,
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: SingleChildScrollView(
+              child: Text(
+                _pingResult,
+                style: const TextStyle(
+                  color: Colors.greenAccent,
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ==================== Modal النافذة التفاعلية للوصول السريع للأجهزة ====================
 void _showDeviceQuickAccessModal(
   BuildContext context, {
@@ -418,8 +554,6 @@ void _showDeviceQuickAccessModal(
               style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 15),
-
-            // 1. الدخول للراوتر
             ListTile(
               tileColor: const Color(0xFF0F172A),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -436,8 +570,6 @@ void _showDeviceQuickAccessModal(
               },
             ),
             const SizedBox(height: 10),
-
-            // 2. الدخول للنانو (Ubiquiti)
             ListTile(
               tileColor: const Color(0xFF0F172A),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -454,8 +586,6 @@ void _showDeviceQuickAccessModal(
               },
             ),
             const SizedBox(height: 10),
-
-            // 3. الدخول للأونيو (FTTH ONU/ONT)
             ListTile(
               tileColor: const Color(0xFF0F172A),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -478,7 +608,6 @@ void _showDeviceQuickAccessModal(
   );
 }
 
-// دالة فتح الرابط عبر متصفح الهاتف
 Future<void> _openUrl(BuildContext context, String ipAddress) async {
   final Uri url = Uri.parse('http://$ipAddress');
   try {
