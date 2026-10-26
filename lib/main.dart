@@ -1,512 +1,495 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:network_info_plus/network_info_plus.dart';
-import 'package:http/http.dart' as http;
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'features_screens.dart'; // استدعاء الشاشات الفرعية
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(const UniRouterApp());
 }
 
 class UniRouterApp extends StatelessWidget {
-  const UniRouterApp({super.key});
+  const UniRouterApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'UniRouter - مدير الراوترات الشامل',
+      title: 'UniRouter Manager',
       debugShowCheckedModeBanner: false,
-      locale: const Locale('ar', 'SA'),
-      supportedLocales: const [Locale('ar', 'SA'), Locale('en', 'US')],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
       theme: ThemeData(
-        useMaterial3: true,
         brightness: Brightness.dark,
+        primarySwatch: Colors.blue,
         scaffoldBackgroundColor: const Color(0xFF0F172A),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF3B82F6),
-          secondary: Color(0xFF10B981),
-          surface: Color(0xFF1E293B),
-        ),
-        fontFamily: 'Roboto',
+        cardColor: const Color(0xFF1E293B),
+        fontFamily: 'Cairo',
       ),
       home: const DashboardScreen(),
     );
   }
 }
 
-// -----------------------------------------------------------------------------
-// MODELS & SERVICES
-// -----------------------------------------------------------------------------
-
-enum RouterBrand { tplink, cudy, tenda, oswante, deco, unknown }
-
-class RouterDeviceInfo {
-  final String ip;
-  final String mac;
-  final String name;
-  final String deviceType;
-  bool isBlocked;
-
-  RouterDeviceInfo({
-    required this.ip,
-    required this.mac,
-    required this.name,
-    required this.deviceType,
-    this.isBlocked = false,
-  });
-}
-
-class NetworkDiscoveryService {
-  final NetworkInfo _networkInfo = NetworkInfo();
-
-  Future<String?> getGatewayIp() async {
-    try {
-      return await _networkInfo.getWifiGatewayIP();
-    } catch (e) {
-      return '192.168.1.1';
-    }
-  }
-
-  Future<String?> getMyIp() async {
-    try {
-      return await _networkInfo.getWifiIP();
-    } catch (e) {
-      return '192.168.1.100';
-    }
-  }
-
-  Future<RouterBrand> detectRouterBrand(String gatewayIp) async {
-    try {
-      final response = await http
-          .get(Uri.parse('http://$gatewayIp'))
-          .timeout(const Duration(seconds: 3));
-
-      final body = response.body.toLowerCase();
-      final headers = response.headers.toString().toLowerCase();
-
-      if (body.contains('tp-link') || body.contains('archer') || headers.contains('tplink')) {
-        return RouterBrand.tplink;
-      } else if (body.contains('tenda') || body.contains('tendawifi')) {
-        return RouterBrand.tenda;
-      } else if (body.contains('cudy')) {
-        return RouterBrand.cudy;
-      } else if (body.contains('oswante') || body.contains('ftth') || body.contains('pon')) {
-        return RouterBrand.oswante;
-      } else if (body.contains('deco')) {
-        return RouterBrand.deco;
-      }
-    } catch (_) {}
-    return RouterBrand.unknown;
-  }
-
-  Future<List<RouterDeviceInfo>> scanConnectedDevices(String gatewayIp) async {
-    List<RouterDeviceInfo> devices = [];
-    final String subnet = gatewayIp.substring(0, gatewayIp.lastIndexOf('.'));
-
-    devices.add(RouterDeviceInfo(
-      ip: '$subnet.101',
-      mac: 'E4:5F:01:22:33:44',
-      name: 'هاتف آيفون (هذا الجهاز)',
-      deviceType: 'Mobile',
-    ));
-    devices.add(RouterDeviceInfo(
-      ip: '$subnet.105',
-      mac: 'AA:BB:CC:DD:EE:01',
-      name: 'سامسونج جالاكسي S23',
-      deviceType: 'Mobile',
-    ));
-    devices.add(RouterDeviceInfo(
-      ip: '$subnet.112',
-      mac: 'B8:27:EB:11:22:33',
-      name: 'شاشة سامسونج سمارت',
-      deviceType: 'TV',
-    ));
-    devices.add(RouterDeviceInfo(
-      ip: '$subnet.120',
-      mac: '00:1A:2B:3C:4D:5E',
-      name: 'كمبيوتر محمول Dell',
-      deviceType: 'Laptop',
-    ));
-
-    return devices;
-  }
-}
-
-// -----------------------------------------------------------------------------
-// MAIN DASHBOARD SCREEN
-// -----------------------------------------------------------------------------
-
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({Key? key}) : super(key: key);
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final NetworkDiscoveryService _discoveryService = NetworkDiscoveryService();
-  
-  String _gatewayIp = 'جاري الفحص...';
-  String _myIp = '...';
-  RouterBrand _selectedBrand = RouterBrand.tplink;
-  bool _isScanning = false;
-  
-  String _wifiSsid = 'Home_WiFi_5G';
-  String _wifiPassword = 'Password1234';
-  
-  List<RouterDeviceInfo> _connectedDevices = [];
+  int _selectedIndex = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _initializeNetwork();
-  }
-
-  Future<void> _initializeNetwork() async {
-    setState(() => _isScanning = true);
-    
-    String? gateway = await _discoveryService.getGatewayIp();
-    String? myIp = await _discoveryService.getMyIp();
-    gateway ??= '192.168.1.1';
-    
-    RouterBrand brand = await _discoveryService.detectRouterBrand(gateway);
-    if (brand == RouterBrand.unknown) brand = RouterBrand.tplink;
-
-    List<RouterDeviceInfo> devices = await _discoveryService.scanConnectedDevices(gateway);
-
-    setState(() {
-      _gatewayIp = gateway!;
-      _myIp = myIp ?? '192.168.1.100';
-      _selectedBrand = brand;
-      _connectedDevices = devices;
-      _isScanning = false;
-    });
-  }
-
-  String _getBrandName(RouterBrand brand) {
-    switch (brand) {
-      case RouterBrand.tplink: return 'TP-Link Tether';
-      case RouterBrand.cudy: return 'Cudy Router';
-      case RouterBrand.tenda: return 'Tenda WiFi';
-      case RouterBrand.oswante: return 'Oswante FTTH';
-      case RouterBrand.deco: return 'TP-Link Deco (Mesh)';
-      default: return 'راوتر عام';
-    }
-  }
+  final List<Widget> _screens = [
+    const HomeTab(),
+    const ScannerTab(),
+    const SavedRoutersTab(),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
-          children: [
-            FaIcon(FontAwesomeIcons.router, color: Color(0xFF3B82F6), size: 22),
-            SizedBox(width: 10),
-            Text('UniRouter - الشامل', style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
+        title: const Text('UniRouter - حسين لخدمات الإنترنت'),
+        backgroundColor: const Color(0xFF1E293B),
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _initializeNetwork,
-            tooltip: 'إعادة فحص الشبكة',
+            icon: const Icon(Icons.notifications_active),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('بوت التليجرام متصل وجاهز لإرسال التنبيهات')),
+              );
+            },
           ),
         ],
       ),
-      body: _isScanning
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('جاري اكتشاف الراوتر والأجهزة المتصلة...'),
-                ],
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 1. Selector Bar
-                  _buildRouterSelectorCard(),
-
-                  const SizedBox(height: 16),
-
-                  // 2. Navigation Features Buttons (الرقابة وأدوات السرعة)
-                  _buildFeatureNavigationRow(context),
-
-                  const SizedBox(height: 16),
-
-                  // 3. Network Status Card
-                  _buildNetworkInfoCard(),
-
-                  const SizedBox(height: 16),
-
-                  // 4. WiFi Settings Card
-                  _buildWifiConfigCard(),
-
-                  const SizedBox(height: 16),
-
-                  // 5. Devices List
-                  _buildConnectedDevicesCard(),
-                ],
-              ),
-            ),
-    );
-  }
-
-  Widget _buildRouterSelectorCard() {
-    return Card(
-      color: const Color(0xFF1E293B),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'الراوتر المتصل حالياً:',
-              style: TextStyle(color: Colors.grey, fontSize: 13),
-            ),
-            const SizedBox(height: 8),
-            DropdownButton<RouterBrand>(
-              value: _selectedBrand,
-              isExpanded: true,
-              dropdownColor: const Color(0xFF1E293B),
-              underline: Container(),
-              items: RouterBrand.values
-                  .where((b) => b != RouterBrand.unknown)
-                  .map((brand) {
-                return DropdownMenuItem<RouterBrand>(
-                  value: brand,
-                  child: Row(
-                    children: [
-                      const FaIcon(FontAwesomeIcons.networkWired, size: 16, color: Color(0xFF3B82F6)),
-                      const SizedBox(width: 10),
-                      Text(_getBrandName(brand), style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: (newBrand) {
-                if (newBrand != null) {
-                  setState(() => _selectedBrand = newBrand);
-                }
+      body: Row(
+        children: [
+          if (MediaQuery.of(context).size.width > 800)
+            NavigationRail(
+              backgroundColor: const Color(0xFF1E293B),
+              selectedIndex: _selectedIndex,
+              onDestinationSelected: (int index) {
+                setState(() {
+                  _selectedIndex = index;
+                });
               },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFeatureNavigationRow(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E293B),
-              foregroundColor: Colors.blue,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ParentalControlScreen()),
-              );
-            },
-            icon: const FaIcon(FontAwesomeIcons.shieldHalved, size: 16),
-            label: const Text('الرقابة والسرعة', style: TextStyle(fontSize: 13)),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1E293B),
-              foregroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SpeedTestScreen()),
-              );
-            },
-            icon: const FaIcon(FontAwesomeIcons.gaugeHigh, size: 16),
-            label: const Text('فحص واختبار السرعة', style: TextStyle(fontSize: 13)),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNetworkInfoCard() {
-    return Card(
-      color: const Color(0xFF1E293B),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildStatItem('عنوان Gateway', _gatewayIp, FontAwesomeIcons.server, Colors.blue),
-            Container(height: 40, width: 1, color: Colors.grey.shade800),
-            _buildStatItem('عنوان الموبايل', _myIp, FontAwesomeIcons.mobile, Colors.green),
-            Container(height: 40, width: 1, color: Colors.grey.shade800),
-            _buildStatItem('الأجهزة المتصلة', '${_connectedDevices.length}', FontAwesomeIcons.laptopCode, Colors.orange),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
-    return Column(
-      children: [
-        FaIcon(icon, color: color, size: 18),
-        const SizedBox(height: 6),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
-      ],
-    );
-  }
-
-  Widget _buildWifiConfigCard() {
-    return Card(
-      color: const Color(0xFF1E293B),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                FaIcon(FontAwesomeIcons.wifi, color: Color(0xFF10B981), size: 18),
-                SizedBox(width: 8),
-                Text('إعدادات الواي فاي السريعة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              labelType: NavigationRailLabelType.all,
+              destinations: const [
+                NavigationRailDestination(
+                  icon: Icon(Icons.dashboard_outlined),
+                  selectedIcon: Icon(Icons.dashboard),
+                  label: Text('الرئيسية'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.wifi_find_outlined),
+                  selectedIcon: Icon(Icons.wifi_find),
+                  label: Text('فحص الشبكة'),
+                ),
+                NavigationRailDestination(
+                  icon: Icon(Icons.router_outlined),
+                  selectedIcon: Icon(Icons.router),
+                  label: Text('الراوترات المحفوظة'),
+                ),
               ],
             ),
-            const Divider(height: 24, color: Colors.black26),
-            TextFormField(
-              initialValue: _wifiSsid,
-              decoration: const InputDecoration(
-                labelText: 'اسم الشبكة (SSID)',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              onChanged: (val) => _wifiSsid = val,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              initialValue: _wifiPassword,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'كلمة السر (Password)',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              onChanged: (val) => _wifiPassword = val,
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF3B82F6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          Expanded(
+            child: _screens[_selectedIndex],
+          ),
+        ],
+      ),
+      bottomNavigationBar: MediaQuery.of(context).size.width <= 800
+          ? BottomNavigationBar(
+              backgroundColor: const Color(0xFF1E293B),
+              selectedItemColor: Colors.blueAccent,
+              unselectedItemColor: Colors.grey,
+              currentIndex: _selectedIndex,
+              onTap: (int index) {
+                setState(() {
+                  _selectedIndex = index;
+                });
+              },
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.dashboard),
+                  label: 'الرئيسية',
                 ),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('تم إرسال أمر التعديل إلى ${_getBrandName(_selectedBrand)} بنجاح!'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.save, size: 18, color: Colors.white),
-                label: const Text('حفظ التعديلات على الراوتر', style: TextStyle(color: Colors.white)),
-              ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.wifi_find),
+                  label: 'فحص الشبكة',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.router),
+                  label: 'المحفوظة',
+                ),
+              ],
             )
-          ],
-        ),
+          : null,
+    );
+  }
+}
+
+// ==================== 1. شاشة الرئيسية ====================
+class HomeTab extends StatelessWidget {
+  const HomeTab({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: ListView(
+        children: [
+          const Text(
+            'مرحباً بك، حسين 👋',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            'نظام إدارة وصيانة شبكات الإنترنت والراوترات.',
+            style: TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 20),
+          GridView.count(
+            crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 1,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            children: const [
+              DashboardCard(
+                title: 'الأجهزة المحفوظة',
+                value: '4 راوترات',
+                icon: Icons.router,
+                color: Colors.blue,
+              ),
+              DashboardCard(
+                title: 'بوابة الشبكة (Gateway)',
+                value: '192.168.1.1',
+                icon: Icons.lan,
+                color: Colors.green,
+              ),
+              DashboardCard(
+                title: 'تكامل التليجرام',
+                value: 'متصل وجاهز',
+                icon: Icons.smart_toy,
+                color: Colors.orange,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class DashboardCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const DashboardCard({
+    Key? key,
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 40, color: color),
+          const SizedBox(height: 15),
+          Text(title, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+          const SizedBox(height: 5),
+          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================== 2. شاشة فحص الشبكة ====================
+class ScannerTab extends StatelessWidget {
+  const ScannerTab({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('فحص الأجهزة على الشبكة المحلية (Network Scanner)',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 15),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blueAccent,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('جاري فحص نطاق IP الحالي (192.168.1.x)...')),
+              );
+            },
+            icon: const Icon(Icons.search),
+            label: const Text('بدء فحص الشبكة'),
+          ),
+          const SizedBox(height: 20),
+          Expanded(
+            child: ListView(
+              children: [
+                _buildConnectedDeviceItem(context, 'الراوتر الرئيسي (Gateway)', '192.168.1.1', 'TP-Link / Cudy'),
+                _buildConnectedDeviceItem(context, 'صحن / نانو (Ubiquiti Dish)', '192.168.1.20', 'PowerBeam M5 / AC'),
+                _buildConnectedDeviceItem(context, 'جهاز أونيو (FTTH ONU)', '192.168.100.1', 'Huawei ONU'),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildConnectedDevicesCard() {
+  Widget _buildConnectedDeviceItem(BuildContext context, String title, String ip, String deviceType) {
     return Card(
       color: const Color(0xFF1E293B),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        leading: const Icon(Icons.devices, color: Colors.blueAccent),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text('IP: $ip - ($deviceType)'),
+        trailing: IconButton(
+          icon: const Icon(Icons.open_in_browser, color: Colors.greenAccent),
+          onPressed: () => _openUrl(context, ip),
+        ),
+      ),
+    );
+  }
+}
+
+// ==================== 3. شاشة الراوترات المحفوظة والربط المباشر ====================
+class SavedRoutersTab extends StatelessWidget {
+  const SavedRoutersTab({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Map<String, String>> sampleRouters = [
+      {
+        'name': 'TP-Link Archer C20',
+        'ip': '192.168.0.1',
+        'nanoIp': '192.168.1.20',
+        'onuIp': '192.168.100.1',
+        'type': 'TP-Link Router'
+      },
+      {
+        'name': 'Tenda N300 / F3',
+        'ip': '192.168.0.1',
+        'nanoIp': '192.168.1.21',
+        'onuIp': '192.168.100.1',
+        'type': 'Tenda Router'
+      },
+      {
+        'name': 'Cudy WR1300',
+        'ip': '192.168.10.1',
+        'nanoIp': '192.168.1.22',
+        'onuIp': '192.168.100.1',
+        'type': 'Cudy Mesh/Router'
+      },
+      {
+        'name': 'MikroTik Main Board',
+        'ip': '192.168.88.1',
+        'nanoIp': '192.168.1.254',
+        'onuIp': '192.168.100.1',
+        'type': 'MikroTik Core'
+      },
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('الراوترات المحفوظة والأجهزة المقترنة',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ElevatedButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('إضافة راوتر'),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+              ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          Expanded(
+            child: ListView.builder(
+              itemCount: sampleRouters.length,
+              itemBuilder: (context, index) {
+                final r = sampleRouters[index];
+                return Card(
+                  color: const Color(0xFF1E293B),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ListTile(
+                    leading: const Icon(Icons.router, color: Colors.orangeAccent, size: 32),
+                    title: Text(r['name']!, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text('IP: ${r['ip']} | نوع: ${r['type']}'),
+                    trailing: ElevatedButton.icon(
+                      icon: const Icon(Icons.link, size: 16),
+                      label: const Text('فتح الأجهزة'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF334155),
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () {
+                        _showDeviceQuickAccessModal(
+                          context,
+                          routerName: r['name']!,
+                          routerIp: r['ip']!,
+                          nanoIp: r['nanoIp']!,
+                          onuIp: r['onuIp']!,
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================== Modal النافذة التفاعلية للوصول السريع للأجهزة ====================
+void _showDeviceQuickAccessModal(
+  BuildContext context, {
+  required String routerName,
+  required String routerIp,
+  required String nanoIp,
+  required String onuIp,
+}) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (context) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E293B),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('الأجهزة المتصلة بالشبكة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                Chip(
-                  label: Text('${_connectedDevices.length} أجهزة'),
-                  backgroundColor: Colors.blue.withOpacity(0.2),
-                )
+                const Icon(Icons.hub, color: Colors.blueAccent, size: 28),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      routerName,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    Text(
+                      'عنوان الراوتر الرئيسي: $routerIp',
+                      style: const TextStyle(color: Colors.grey, fontSize: 13),
+                    ),
+                  ],
+                ),
               ],
             ),
-            const SizedBox(height: 10),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _connectedDevices.length,
-              itemBuilder: (context, index) {
-                final dev = _connectedDevices[index];
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: dev.isBlocked ? Colors.red.withOpacity(0.2) : Colors.green.withOpacity(0.2),
-                    child: Icon(
-                      dev.deviceType == 'Mobile' ? Icons.phone_android : Icons.laptop,
-                      color: dev.isBlocked ? Colors.red : Colors.green,
-                    ),
-                  ),
-                  title: Text(dev.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                  subtitle: Text('${dev.ip}  |  ${dev.mac}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                  trailing: IconButton(
-                    icon: Icon(
-                      dev.isBlocked ? Icons.block : Icons.check_circle,
-                      color: dev.isBlocked ? Colors.red : Colors.grey,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        dev.isBlocked = !dev.isBlocked;
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(dev.isBlocked ? 'تم حظر الجهاز' : 'تم الغاء حظر الجهاز'),
-                          duration: const Duration(seconds: 1),
-                        ),
-                      );
-                    },
-                  ),
-                );
+            const Divider(height: 25, color: Colors.white10),
+            const Text(
+              'اختر الجهاز المراد الدخول لصفحته مباشرة:',
+              style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 15),
+
+            // 1. الدخول للراوتر
+            ListTile(
+              tileColor: const Color(0xFF0F172A),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              leading: const CircleAvatar(
+                backgroundColor: Colors.blueAccent,
+                child: Icon(Icons.router, color: Colors.white, size: 20),
+              ),
+              title: const Text('صفحة إعدادات الراوتر', style: TextStyle(color: Colors.white)),
+              subtitle: Text('http://$routerIp', style: const TextStyle(color: Colors.grey)),
+              trailing: const Icon(Icons.open_in_new, color: Colors.blueAccent),
+              onTap: () {
+                Navigator.pop(context);
+                _openUrl(context, routerIp);
               },
-            )
+            ),
+            const SizedBox(height: 10),
+
+            // 2. الدخول للنانو (Ubiquiti)
+            ListTile(
+              tileColor: const Color(0xFF0F172A),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              leading: const CircleAvatar(
+                backgroundColor: Colors.orangeAccent,
+                child: Icon(Icons.cell_tower, color: Colors.white, size: 20),
+              ),
+              title: const Text('صفحة النانو (Ubiquiti PowerBeam / AirOS)', style: TextStyle(color: Colors.white)),
+              subtitle: Text('http://$nanoIp', style: const TextStyle(color: Colors.grey)),
+              trailing: const Icon(Icons.open_in_new, color: Colors.orangeAccent),
+              onTap: () {
+                Navigator.pop(context);
+                _openUrl(context, nanoIp);
+              },
+            ),
+            const SizedBox(height: 10),
+
+            // 3. الدخول للأونيو (FTTH ONU/ONT)
+            ListTile(
+              tileColor: const Color(0xFF0F172A),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              leading: const CircleAvatar(
+                backgroundColor: Colors.green,
+                child: Icon(Icons.settings_input_antenna, color: Colors.white, size: 20),
+              ),
+              title: const Text('صفحة الأونيو (FTTH ONU / Huawei ONT)', style: TextStyle(color: Colors.white)),
+              subtitle: Text('http://$onuIp', style: const TextStyle(color: Colors.grey)),
+              trailing: const Icon(Icons.open_in_new, color: Colors.green),
+              onTap: () {
+                Navigator.pop(context);
+                _openUrl(context, onuIp);
+              },
+            ),
           ],
         ),
-      ),
+      );
+    },
+  );
+}
+
+// دالة فتح الرابط عبر متصفح الهاتف
+Future<void> _openUrl(BuildContext context, String ipAddress) async {
+  final Uri url = Uri.parse('http://$ipAddress');
+  try {
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر فتح الصفحة: $ipAddress')),
+      );
+    }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('خطأ أثناء فتح الرابط: http://$ipAddress')),
     );
   }
 }
