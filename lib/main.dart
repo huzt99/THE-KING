@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'features_screens.dart'; // استدعاء الشاشات الفرعية
 
 void main() {
   runApp(const UniRouterApp());
@@ -71,7 +70,7 @@ class NetworkDiscoveryService {
     try {
       return await _networkInfo.getWifiGatewayIP();
     } catch (e) {
-      return '192.168.1.1'; // IP افتراضي للراحة
+      return '192.168.1.1';
     }
   }
 
@@ -83,7 +82,6 @@ class NetworkDiscoveryService {
     }
   }
 
-  // التعرف الذكي على الماركة عبر الاستجابة الفهرسية للعنوان المحلي
   Future<RouterBrand> detectRouterBrand(String gatewayIp) async {
     try {
       final response = await http
@@ -104,18 +102,14 @@ class NetworkDiscoveryService {
       } else if (body.contains('deco')) {
         return RouterBrand.deco;
       }
-    } catch (_) {
-      // في حالة التعذر المباشر
-    }
+    } catch (_) {}
     return RouterBrand.unknown;
   }
 
-  // فحص الأجهزة المتصلة بالشبكة المحلية عبر Subnet Ping
   Future<List<RouterDeviceInfo>> scanConnectedDevices(String gatewayIp) async {
     List<RouterDeviceInfo> devices = [];
     final String subnet = gatewayIp.substring(0, gatewayIp.lastIndexOf('.'));
 
-    // إضافة أجهزة وهمية للعرض التفاعلي
     devices.add(RouterDeviceInfo(
       ip: '$subnet.101',
       mac: 'E4:5F:01:22:33:44',
@@ -211,11 +205,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
+        title: const Row(
           children: [
-            const FaIcon(FontAwesomeIcons.router, color: Color(0xFF3B82F6), size: 22),
-            const SizedBox(width: 10),
-            const Text('UniRouter', style: TextStyle(fontWeight: FontWeight.bold)),
+            FaIcon(FontAwesomeIcons.router, color: Color(0xFF3B82F6), size: 22),
+            SizedBox(width: 10),
+            Text('UniRouter - الشامل', style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
         actions: [
@@ -247,17 +241,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   const SizedBox(height: 16),
 
-                  // 2. Network Status Card
+                  // 2. Navigation Features Buttons (الرقابة وأدوات السرعة)
+                  _buildFeatureNavigationRow(context),
+
+                  const SizedBox(height: 16),
+
+                  // 3. Network Status Card
                   _buildNetworkInfoCard(),
 
                   const SizedBox(height: 16),
 
-                  // 3. WiFi Settings Card
+                  // 4. WiFi Settings Card
                   _buildWifiConfigCard(),
 
                   const SizedBox(height: 16),
 
-                  // 4. Devices List
+                  // 5. Devices List
                   _buildConnectedDevicesCard(),
                 ],
               ),
@@ -310,6 +309,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildFeatureNavigationRow(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E293B),
+              foregroundColor: Colors.blue,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ParentalControlScreen()),
+              );
+            },
+            icon: const FaIcon(FontAwesomeIcons.shieldHalved, size: 16),
+            label: const Text('الرقابة والسرعة', style: TextStyle(fontSize: 13)),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E293B),
+              foregroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SpeedTestScreen()),
+              );
+            },
+            icon: const FaIcon(FontAwesomeIcons.gaugeHigh, size: 16),
+            label: const Text('فحص واختبار السرعة', style: TextStyle(fontSize: 13)),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildNetworkInfoCard() {
     return Card(
       color: const Color(0xFF1E293B),
@@ -354,7 +397,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 FaIcon(FontAwesomeIcons.wifi, color: Color(0xFF10B981), size: 18),
                 SizedBox(width: 8),
-                Text('إعدادات الواي فاي (Wi-Fi Quick Edit)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text('إعدادات الواي فاي السريعة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ],
             ),
             const Divider(height: 24, color: Colors.black26),
