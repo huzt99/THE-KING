@@ -139,11 +139,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     onPressed: _isLoading ? null : _handleLogin,
                     child: _isLoading
-                        ,
-                      : const Text(
-                          "تسجيل الدخول",
-                          style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
+                        ? const CircularProgressIndicator(color: Colors.black)
+                        : const Text(
+                            "تسجيل الدخول",
+                            style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
                   ),
                 ),
               ],
@@ -167,14 +167,12 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isScanning = false;
   List<Map<String, String>> discoveredDevices = [];
 
-  // دالة فحص الشبكة الحقيقية لأنواع الراوترات (TP-Link, Deco, Tenda, Cudy, ONT)
   void _startNetworkScan() async {
     setState(() {
       _isScanning = true;
       discoveredDevices.clear();
     });
 
-    // محاكاة الفحص الفعلي للشبكة الميدانية وجلب الأجهزة المتاحة
     await Future.delayed(const Duration(seconds: 2));
 
     setState(() {
@@ -234,7 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 20),
             Row(
-              mainAxisAlignment: MainAxisAlignment.between,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text("فحص الشبكة والأجهزة المتصلة", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ElevatedButton.icon(
@@ -271,7 +269,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                 trailing: ElevatedButton(
                                   style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey),
                                   onPressed: () {
-                                    // هنا يتم ربط فتح صفحة الراوتر عبر الـ IP الفعلي
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(content: Text("الاتصال بالعنوان: ${device["ip"]}")),
                                     );
