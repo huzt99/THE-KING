@@ -1,0 +1,30 @@
+name: unirouter
+description: "All-in-One Router Management App"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  
+  # Network & Hardware Libraries
+  network_info_plus: ^5.0.1      # للحصول على IP الهاتف والـ Gateway
+  http: ^1.2.0                   # لإرسال طلبات HTTP/REST للراوترات
+  ping_discover_network_plus: ^2.1.0 # لفحص الأجهزة المتصلة بالشبكة
+  dart_ping: ^8.0.1              # أداة تشخيص Ping
+  shared_preferences: ^2.2.2    # لحفظ بيانات الراوتر المحفوظة
+  crypto: ^3.0.3                 # للتشفير (MD5/SHA256) المطلوبة في راوترات مثل TP-Link/Tenda
+  font_awesome_flutter: ^10.7.0  # أيقونات عصرية
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
