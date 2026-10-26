@@ -12,8 +12,6 @@ dependencies:
     sdk: flutter
   shared_preferences: ^2.2.2
   http: ^1.2.0
-  dart_ping: ^7.0.0
-  ping_discover_network: ^1.1.0
   cupertino_icons: ^1.0.6
 
 dev_dependencies:
