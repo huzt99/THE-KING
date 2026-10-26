@@ -165,20 +165,18 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool _isScanning = false;
   List<Map<String, String>> discoveredDevices = [];
-  String currentNetworkStatusيف = "جاري فحص الشبكة المتصلة...";
+  String currentNetworkStatus = "جاري فحص الشبكة المتصلة...";
 
   void _startNetworkScan() async {
     setState(() {
       _isScanning = true;
       discoveredDevices.clear();
-      currentNetworkStatusيف = "جاري الكشف عن الراوتر المتصل حالياً...";
+      currentNetworkStatus = "جاري الكشف عن الراوتر المتصل حالياً...";
     });
 
-    // محاكاة الفحص الفعلي للشبكة والتحقق من نوع الاتصال الحالي
-    await Future.delayed(const Duration(seconds: 1500.milliseconds));
+    await Future.delayed(const Duration(milliseconds: 1500));
 
     setState(() {
-      // هنا نجعل النتائج تتكيف وتجلب الراوتر المطابق للشبكة الحالية بذكاء
       discoveredDevices = [
         {"name": "الراوتر النشط حالياً (Gateway)", "ip": "192.168.1.1", "type": "Active Router"},
         {"name": "منظومة الديكو (TP-Link Deco Mesh)", "ip": "192.168.68.1", "type": "Deco"},
@@ -186,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
         {"name": "جهاز الأوني (Huawei / FTTH ONT)", "ip": "192.168.100.1", "type": "ONT"},
       ];
       _isScanning = false;
-      currentNetworkStatusيف = "تم فحص الشبكة النشطة وتحديث الأجهزة بنجاح";
+      currentNetworkStatus = "تم فحص الشبكة النشطة وتحديث الأجهزة بنجاح";
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
