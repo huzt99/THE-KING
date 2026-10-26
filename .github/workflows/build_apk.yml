@@ -30,11 +30,23 @@ jobs:
       - name: Clean Project
         run: flutter clean
 
+      - name: Force Fix Android Embedding
+        run: |
+          mkdir -p android/app/src/main/kotlin/com/example/unirouter_manager
+          cat << 'EOF' > android/app/src/main/kotlin/com/example/unirouter_manager/MainActivity.kt
+          package com.example.unirouter_manager
+
+          import io.flutter.embedding.android.FlutterActivity
+
+          class MainActivity: FlutterActivity() {
+          }
+          EOF
+
       - name: Get Dependencies
         run: flutter pub get
 
       - name: Build APK Release
-        run: flutter build apk --release --no-pub
+        run: flutter build apk --release
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
